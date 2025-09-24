@@ -1,0 +1,14 @@
+[package]
+name = "cublas_matmul"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+
+# FFI crates
+cuda-runtime-sys = { version = "0.3.0-alpha.1" }
+cublas-sys = "0.1.0"
+
+[build-dependencies]
+# For build script, if needed to detect environment

@@ -55,3 +55,32 @@ jobs:
 -CLI with descriptive statistics on a well known dataset using https://www.pola.rs/[Polars]
 - Train a model with PyTorch (via Rust bindings)
 - Explore use-cases in Financial Analysis, trading and DeFi
+
+
+## 🚀 Example: Rust + CUDA/cuBLAS Integration
+
+This project demonstrates how to call NVIDIA GPU libraries (CUDA Runtime + cuBLAS)
+directly from Rust for high-performance linear algebra.
+
+- **What it does:** Implements matrix multiplication (`SGEMM`) on the GPU.
+- **Why it matters:** Shows Rust’s potential in HPC/ML workloads, combining safety with raw performance.
+- **Skills highlighted:**
+  - FFI bindings (`cuda-runtime-sys`, `cublas-sys`)
+  - GPU memory management (malloc, free, memcpy)
+  - Handling column-major storage (as cuBLAS expects)
+  - Wrapping C error codes safely with Rust’s `Result` and `anyhow`
+
+### Run the Example
+
+Make sure CUDA and cuDNN are installed, and DLLs are available in your `PATH`.
+
+```bash
+cargo run -p cublas_matmul
+Expected output:
+
+A (row-major original): [ [1 2 3], [4 5 6] ]
+B (row-major original): [ [7 8], [9 10], [11 12] ]
+C (row-major computed): [58.0, 64.0, 139.0, 154.0]
+```
+
+This is a foundational building block for more advanced Rust + GPU ML workflows (deep learning, tensor ops, serverless deployment, etc.).
