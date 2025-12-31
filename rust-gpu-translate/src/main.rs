@@ -4,10 +4,11 @@
 //!  - `translate` : translate text (supports `--text` or `--file`), defaults English -> German
 //!  - `languages` : print a full table of supported languages and ISO codes
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use rust_bert::pipelines::translation::Language;
-use rust_gpu_translate::{language_table, read_file, translate_lines};
+use rust_gpu_translate::{TranslationSession, language_table, read_file, translate_lines};
+use std::io::{self, Write};
 
 #[derive(Parser)]
 #[command(
@@ -88,18 +89,45 @@ fn main() -> Result<()> {
                 .ok_or_else(|| anyhow!("Unknown target language: {}", target))?;
             let use_gpu = !no_gpu;
 
-            if let Some(t) = text {
-                let outputs = translate_lines(&[t], source_lang, target_lang, use_gpu)?;
-                println!("Translation: {}", outputs.get(0).unwrap_or(&String::new()));
-            } else if let Some(path) = file {
+            // For file input: build one session and translate all lines (fast).
+            if let Some(path) = file {
                 let contents = read_file(path)?;
                 let lines: Vec<String> = contents.lines().map(|s| s.to_string()).collect();
-                let outputs = translate_lines(&lines, source_lang, target_lang, use_gpu)?;
+                let session = TranslationSession::new(source_lang, target_lang, use_gpu)?;
+                let outputs = session.translate_lines(&lines)?;
                 for s in outputs {
                     println!("{}", s);
                 }
             } else {
-                println!("No input provided. Use --text or --file. See --help for details.");
+                // Interactive mode (optional initial --text): build one session and reuse it.
+                let session = TranslationSession::new(source_lang, target_lang, use_gpu)?;
+
+                if let Some(t) = text {
+                    let out = session.translate(t)?;
+                    println!("Translation: {}", out);
+                    println!(
+                        "Entering interactive mode (empty line to quit). Type text to translate:"
+                    );
+                } else {
+                    println!("Interactive mode (empty line to quit). Type text to translate:");
+                }
+
+                let stdin = io::stdin();
+                loop {
+                    print!("> ");
+                    io::stdout().flush()?;
+                    let mut buf = String::new();
+                    let n = stdin.read_line(&mut buf)?;
+                    if n == 0 {
+                        break;
+                    } // EOF
+                    let s = buf.trim();
+                    if s.is_empty() {
+                        break;
+                    }
+                    let out = session.translate(s)?;
+                    println!("{}", out);
+                }
             }
         }
         Commands::Languages {} => print_languages(),

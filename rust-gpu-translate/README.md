@@ -42,6 +42,19 @@ cargo run -- translate --file /path/to/sentences.txt
 cargo run -- languages
 ```
 
+### Interactive REPL
+
+The `translate` subcommand now supports an interactive REPL when no file is specified. Behavior:
+
+- If you run `translate --text "..."` the CLI will translate the provided sentence and then enter the interactive REPL.
+- If you run `translate --file <PATH>` the tool translates all lines in the file and exits (no REPL).
+- If you run `translate` with no `--text` or `--file` it will enter the interactive REPL immediately.
+- To exit the REPL, enter an empty line or send EOF (Ctrl+D on Linux/macOS, Ctrl+Z Enter on Windows).
+
+Notes:
+
+- The application builds a single `TranslationSession` (model) once per run and reuses it for all translations in the session. This avoids rebuilding the model for every line and improves interactive performance.
+
 ### Translate subcommand options
 
 - `--text <TEXT>` / `-T <TEXT>` : single sentence to translate
@@ -102,7 +115,8 @@ You can also use the provided helper scripts:
 ## Implementation details 🔍
 
 - The translation pipeline uses `rust-bert`'s `TranslationModelBuilder` and selects a pretrained model that supports the requested language pair.
-- The tool sets device using `tch::Device::cuda_if_available()` unless `--no-gpu` is passed (so it runs on GPU when LibTorch + CUDA is present). The CLI now prints available devices and the selected device before running inference.
+- The tool sets device using `tch::Device::cuda_if_available()` unless `--no-gpu` is passed (so it runs on GPU when LibTorch + CUDA is present). Device diagnostics are printed once when the translation session is created (not on every translation).
+- The CLI creates a `TranslationSession` that builds the model once for the chosen language pair and device; the session is reused for subsequent translations (interactive and file modes) to improve performance and avoid repeated model initialization.
 - `language_table()` collects each `Language` variant's display name and optional ISO-639-1 code (via `Language::get_iso_639_1_code()`), and the `languages` subcommand prints a simple table with that information.
 
 ### Monitoring GPU / system usage

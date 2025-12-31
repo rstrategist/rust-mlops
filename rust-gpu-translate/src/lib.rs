@@ -5,7 +5,7 @@
 //! GPU; otherwise it falls back to CPU. Use the CLI (in `main.rs`) for a simple user-facing tool.
 
 use anyhow::Result;
-use rust_bert::pipelines::translation::{Language, TranslationModelBuilder};
+use rust_bert::pipelines::translation::{Language, TranslationModel, TranslationModelBuilder};
 use std::fs::File;
 use std::io::Read;
 use tch::Device;
@@ -28,65 +28,84 @@ pub fn read_file_array(path: String) -> Result<Vec<String>> {
     Ok(array)
 }
 
-/// Translate a slice of input sentences using `rust-bert`'s translation pipeline.
-///
-/// - `lines` is the input sentences (one per element)
-/// - `source` and `target` specify the languages
-/// - `use_gpu` toggles whether the function will attempt to run on CUDA when available
-///
-/// Returns a vector with the translated strings in the same order as the inputs.
+/// Session that owns a single translation pipeline (built once) and reuses it for
+/// subsequent translations. This avoids rebuilding the model on every call and also
+/// centralizes the device detection and diagnostics (printed once at session creation).
+pub struct TranslationSession {
+    model: TranslationModel,
+    target: Language,
+}
+
+impl TranslationSession {
+    /// Build a new session for the given language pair and device preference.
+    pub fn new(source: Language, target: Language, use_gpu: bool) -> Result<Self> {
+        let device: Device = if use_gpu {
+            Device::cuda_if_available()
+        } else {
+            Device::Cpu
+        };
+
+        // Print available devices and which will be used (only once per session)
+        println!("Available devices:");
+        println!(" - CPU");
+        if tch::Cuda::is_available() {
+            let count = tch::Cuda::device_count();
+            println!(" - CUDA available (device_count={})", count);
+            // Try to get GPU names via nvidia-smi if present
+            match std::process::Command::new("nvidia-smi")
+                .args(&["--query-gpu=name", "--format=csv,noheader"])
+                .output()
+            {
+                Ok(out) if out.status.success() => {
+                    let names = String::from_utf8_lossy(&out.stdout);
+                    for (i, name) in names.lines().enumerate() {
+                        println!("    - [{}] {}", i, name.trim());
+                    }
+                }
+                _ => {
+                    for i in 0..tch::Cuda::device_count() {
+                        println!("    - CUDA device {}", i);
+                    }
+                }
+            }
+        } else {
+            println!(" - CUDA not available");
+        }
+        println!("Selected device: {:?}", device);
+
+        let model = TranslationModelBuilder::new()
+            .with_source_languages(vec![source])
+            .with_target_languages(vec![target])
+            .with_device(device)
+            .create_model()?;
+
+        Ok(Self { model, target })
+    }
+
+    /// Translate a single sentence.
+    pub fn translate<S: AsRef<str>>(&self, sentence: S) -> Result<String> {
+        let input = [sentence.as_ref()];
+        let out = self.model.translate(&input, None, self.target)?;
+        Ok(out.get(0).cloned().unwrap_or_default())
+    }
+
+    /// Translate a slice of sentences.
+    pub fn translate_lines<S: AsRef<str>>(&self, lines: &[S]) -> Result<Vec<String>> {
+        let input_refs: Vec<&str> = lines.iter().map(|s| s.as_ref()).collect();
+        let out = self.model.translate(&input_refs, None, self.target)?;
+        Ok(out)
+    }
+}
+
+/// Convenience wrapper that keeps the original API: build a session and translate the lines.
 pub fn translate_lines<S: AsRef<str>>(
     lines: &[S],
     source: Language,
     target: Language,
     use_gpu: bool,
 ) -> Result<Vec<String>> {
-    let device: Device = if use_gpu {
-        Device::cuda_if_available()
-    } else {
-        Device::Cpu
-    };
-
-    // Print available devices and which will be used
-    println!("Available devices:");
-    println!(" - CPU");
-    if tch::Cuda::is_available() {
-        let count = tch::Cuda::device_count();
-        println!(" - CUDA available (device_count={})", count);
-        // Try to get GPU names via nvidia-smi if present
-        match std::process::Command::new("nvidia-smi")
-            .args(&["--query-gpu=name", "--format=csv,noheader"])
-            .output()
-        {
-            Ok(out) if out.status.success() => {
-                let names = String::from_utf8_lossy(&out.stdout);
-                for (i, name) in names.lines().enumerate() {
-                    println!("    - [{}] {}", i, name.trim());
-                }
-            }
-            _ => {
-                for i in 0..tch::Cuda::device_count() {
-                    println!("    - CUDA device {}", i);
-                }
-            }
-        }
-    } else {
-        println!(" - CUDA not available");
-    }
-    println!("Selected device: {:?}", device);
-
-    // Build a translation model for the requested languages and device. The builder will
-    // pick an appropriate pretrained model that supports the requested language pair.
-    let model = TranslationModelBuilder::new()
-        .with_source_languages(vec![source])
-        .with_target_languages(vec![target])
-        .with_device(device)
-        .create_model()?;
-
-    // Translate - the pipeline accepts slices of &str
-    let input_refs: Vec<&str> = lines.iter().map(|s| s.as_ref()).collect();
-    let output = model.translate(&input_refs, None, target)?;
-    Ok(output)
+    let session = TranslationSession::new(source, target, use_gpu)?;
+    session.translate_lines(lines)
 }
 
 /// Convenience wrapper: read a file and translate each line from Spanish to English on GPU if available.
