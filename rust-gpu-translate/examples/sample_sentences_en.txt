@@ -1,0 +1,4 @@
+Hello, how are you?
+This is a translation test.
+I'd like to book a table for two people.
+Thank you for your help.

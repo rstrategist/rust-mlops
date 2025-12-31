@@ -62,6 +62,13 @@ jobs:
 - Train a model with PyTorch (via Rust bindings)
 - Explore use-cases in Financial Analysis, trading and DeFi
 
+## Example project: rust-gpu-translate (GPU-enabled translation CLI)
+
+- `rust-gpu-translate` is a small CLI that uses `rust-bert` and `tch` (LibTorch bindings) to translate text and can use a CUDA-enabled LibTorch to run on GPU when available.
+- Includes helper scripts (`scripts/run_translate.sh`, `scripts/run_heavy_translate.sh`) with a `--local-libtorch` option or `LOCAL_LIBTORCH` env var to point to a local LibTorch install (useful for WSL setups with local CUDA-enabled LibTorch).
+- Adds a CI workflow (`.github/workflows/script-check.yml`) that verifies helper scripts exist and are executable, and a small Unix-only test (`tests/scripts_executable.rs`) to ensure executable bits for scripts.
+- For details and examples, see `rust-gpu-translate/README.md`.
+
 ## 🚀 Example: Rust + CUDA/cuBLAS Integration
 
 This project demonstrates how to call NVIDIA GPU libraries (CUDA Runtime + cuBLAS)

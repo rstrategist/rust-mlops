@@ -1,0 +1,15 @@
+[package]
+name = "rust-gpu-translate"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0"
+rust-bert = "0.23"
+clap = { version = "4.0", features = ["derive"] }
+# Force `console` std feature so types like `Term` and `Style` are available to indicatif.
+console = { version = "0.16", features = ["std"] }
+# `tch` is used to detect CUDA availability and set the target device for rust-bert
+# (Device::cuda_if_available()). Use the same major version as `rust-bert` to avoid
+# duplicate native-linking (`links = "tch"`) conflicts.
+tch = "0.17"
