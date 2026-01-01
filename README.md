@@ -68,7 +68,9 @@ jobs:
 - Includes helper scripts (`scripts/run_translate.sh`, `scripts/run_heavy_translate.sh`) with a `--local-libtorch` option or `LOCAL_LIBTORCH` env var to point to a local LibTorch install (useful for WSL setups with local CUDA-enabled LibTorch).
 - Adds a CI workflow (`.github/workflows/script-check.yml`) that verifies helper scripts exist and are executable, and a small Unix-only test (`tests/scripts_executable.rs`) to ensure executable bits for scripts.
 - The `translate` subcommand supports an interactive REPL (empty line or EOF to quit) and the app now reuses a single `TranslationSession` per run to avoid rebuilding the model between inputs.
-- For details and examples, see `rust-gpu-translate/README.md`. 
+- For details and examples, see `rust-gpu-translate/README.md`.
+- `pytorch-vision` is a minimal example that uses `tch` (LibTorch bindings) to run ResNet18 inference from Rust; see `pytorch-vision/README.md` for build/run instructions and sample output.
+
 
 ## 🚀 Example: Rust + CUDA/cuBLAS Integration
 
